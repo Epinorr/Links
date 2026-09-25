@@ -222,12 +222,21 @@
 
     <script>
         window.onload = function() {
+            // منتظر می‌مانیم تا فونت‌ها (مخصوصا فونت‌آوسام) کامل لود شوند تا آیکون‌ها روی بوم درست رسم شوند
+            document.fonts.ready.then(() => {
+                initThreeJS();
+            });
+            initButtons();
+        };
+
+        function initThreeJS() {
             const canvas = document.getElementById('bg-canvas');
             const scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x050508, 0.05);
+            // مه‌ای تیره برای محو شدن المان‌های دورتر و ایجاد عمق
+            scene.fog = new THREE.FogExp2(0x050508, 0.035);
 
             const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
-            camera.position.set(0, 3, 12);
+            camera.position.set(0, 0, 15);
 
             const renderer = new THREE.WebGLRenderer({ 
                 canvas: canvas, 
@@ -237,26 +246,96 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-            const geometry = new THREE.PlaneGeometry(40, 40, 100, 100);
-            const material = new THREE.MeshStandardMaterial({
-                color: 0x0a0a12,
-                roughness: 0.3,
-                metalness: 0.8,
-                wireframe: false
+            // لیست تمام المان‌هایی که قرار است در پس‌زمینه معلق باشند
+            const elements = [
+                { type: 'fa', code: '\uf2c6', color: '#2AABEE' }, // Telegram
+                { type: 'fa', code: '\uf16d', color: '#E1306C' }, // Instagram
+                { type: 'fa', code: '\uf167', color: '#FF0000' }, // YouTube
+                { type: 'fa', code: '\ue07b', color: '#00f2fe' }, // TikTok
+                { type: 'svg', path: 'M37 .036h164.448v113.621h54.71v-56.82h54.731V.036h164.448v170.777h-54.73v56.82h-54.711v56.8h54.71v56.82h54.73V512.03H310.89v-56.82h-54.73v-56.8h-54.711v113.62H37V.036z', color: '#53fc18' }, // Kick
+                { type: 'text', text: 'EPINOR', font: 'Outfit', color: '#ffffff' }, 
+                { type: 'text', text: 'EPINOR', font: 'YekanBakh', color: '#00f2fe' }, 
+                { type: 'text', text: 'EPINOR', font: 'Courier New', color: '#E1306C' }, 
+                { type: 'text', text: 'EPINOR', font: 'Georgia', color: '#53fc18' } 
+            ];
+
+            // تبدیل المان‌ها به تکسچرهای درخشان با استفاده از Canvas 2D
+            const textures = elements.map(item => {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = 256;
+                tempCanvas.height = 256;
+                const ctx = tempCanvas.getContext('2d');
+                
+                ctx.shadowColor = item.color;
+                ctx.shadowBlur = 25;
+                ctx.fillStyle = item.color;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                if (item.type === 'fa') {
+                    ctx.font = '900 110px "Font Awesome 6 Brands"';
+                    ctx.fillText(item.code, 128, 128);
+                    ctx.fillText(item.code, 128, 128);
+                } else if (item.type === 'text') {
+                    ctx.font = `bold 45px ${item.font}`;
+                    ctx.fillText(item.text, 128, 128);
+                    ctx.fillText(item.text, 128, 128);
+                } else if (item.type === 'svg') {
+                    ctx.save();
+                    ctx.translate(85, 64);
+                    ctx.scale(0.25, 0.25);
+                    const p = new Path2D(item.path);
+                    ctx.fill(p);
+                    ctx.fill(p);
+                    ctx.restore();
+                }
+                
+                const tex = new THREE.CanvasTexture(tempCanvas);
+                tex.needsUpdate = true;
+                return tex;
             });
 
-            const plane = new THREE.Mesh(geometry, material);
-            plane.rotation.x = -Math.PI / 2; 
-            plane.position.y = -2;
-            scene.add(plane);
+            const particles = [];
+            const particleCount = 40; 
 
-            const ambientLight = new THREE.AmbientLight(0x1a1a2e, 0.5);
-            scene.add(ambientLight);
+            for (let i = 0; i < particleCount; i++) {
+                const tex = textures[Math.floor(Math.random() * textures.length)];
+                
+                // استفاده از Sprite به جای Plane برای جلوگیری از مشکل تخت دیده شدن
+                const material = new THREE.SpriteMaterial({
+                    map: tex,
+                    transparent: true,
+                    blending: THREE.AdditiveBlending, 
+                    depthWrite: false,
+                    opacity: Math.random() * 0.4 + 0.2 
+                });
 
-            const light1 = new THREE.PointLight(0xE1306C, 8, 25); 
-            const light2 = new THREE.PointLight(0x00f2fe, 8, 25); 
-            const light3 = new THREE.PointLight(0x53fc18, 5, 25); 
-            scene.add(light1, light2, light3);
+                const sprite = new THREE.Sprite(material);
+
+                // سایز تصادفی
+                const size = Math.random() * 2 + 1.5;
+                sprite.scale.set(size, size, 1);
+
+                // موقعیت اولیه تصادفی
+                const startX = (Math.random() - 0.5) * 40;
+                const startY = (Math.random() - 0.5) * 30;
+                const startZ = (Math.random() - 0.5) * 20 - 5;
+                
+                sprite.position.set(startX, startY, startZ);
+
+                // تنظیمات حرکت شناور
+                sprite.userData = {
+                    startX: startX,
+                    startY: startY,
+                    speedX: (Math.random() - 0.5) * 0.3, // سرعت شناور شدن در عرض
+                    speedY: (Math.random() - 0.5) * 0.3, // سرعت شناور شدن در ارتفاع
+                    timeOffset: Math.random() * Math.PI * 2,
+                    swaySpeed: (Math.random() - 0.5) * 0.5 // سرعت تاب خوردن ملایم
+                };
+
+                scene.add(sprite);
+                particles.push(sprite);
+            }
 
             let mouseX = 0;
             let mouseY = 0;
@@ -269,38 +348,24 @@
             });
 
             const clock = new THREE.Clock();
-            const positionAttribute = geometry.attributes.position;
 
             function animate() {
                 requestAnimationFrame(animate);
-                const t = clock.getElapsedTime() * 0.4;
+                const time = clock.getElapsedTime();
 
-                light1.position.x = Math.sin(t * 0.8) * 8;
-                light1.position.z = Math.cos(t * 0.5) * 8;
-                light1.position.y = Math.sin(t * 0.3) * 2 + 1;
-
-                light2.position.x = Math.cos(t * 0.6) * 8;
-                light2.position.z = Math.sin(t * 0.7) * 8;
-                light2.position.y = Math.cos(t * 0.4) * 2 + 1;
-
-                light3.position.x = Math.sin(t * 0.9) * 8;
-                light3.position.z = Math.sin(t * 0.9) * 8;
-                light3.position.y = Math.cos(t * 0.6) * 2 + 1;
-
-                for (let i = 0; i < positionAttribute.count; i++) {
-                    const x = positionAttribute.getX(i);
-                    const y = positionAttribute.getY(i);
+                // حرکت دادن تک تک آبجکت‌ها (شناور شدن نرم)
+                particles.forEach(p => {
+                    // حرکت سینوسی باعث میشه مثل حباب تو فضا معلق باشن و گم نشن
+                    p.position.x = p.userData.startX + Math.sin(time * p.userData.speedX + p.userData.timeOffset) * 4;
+                    p.position.y = p.userData.startY + Math.cos(time * p.userData.speedY + p.userData.timeOffset) * 4;
                     
-                    const wave1 = Math.sin(x * 0.2 + t) * 0.5;
-                    const wave2 = Math.cos(y * 0.2 + t) * 0.5;
-                    const wave3 = Math.sin((x + y) * 0.1 - t) * 0.5;
-                    
-                    positionAttribute.setZ(i, wave1 + wave2 + wave3);
-                }
-                positionAttribute.needsUpdate = true;
+                    // یک تاب خوردن (چرخش دوبعدی) بسیار ملایم
+                    p.material.rotation = Math.sin(time * p.userData.swaySpeed) * 0.15;
+                });
 
-                camera.position.x += (mouseX * 1.5 - camera.position.x) * 0.02;
-                camera.position.y += (-mouseY * 1.0 + 3 - camera.position.y) * 0.02;
+                // حرکت ملایم دوربین با موس (Parallax Effect)
+                camera.position.x += (mouseX * 3 - camera.position.x) * 0.03;
+                camera.position.y += (-mouseY * 3 - camera.position.y) * 0.03;
                 camera.lookAt(scene.position);
 
                 renderer.render(scene, camera);
@@ -313,7 +378,9 @@
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
             });
-            
+        }
+
+        function initButtons() {
             const buttons = document.querySelectorAll('.social-btn');
 
             buttons.forEach(button => {
@@ -324,11 +391,12 @@
                     const target = this.getAttribute('target') || '_self';
                     
                     if (href && href !== '#') {
-                        e.preventDefault(); 
+                        e.preventDefault(); // جلوگیری از انتقال سریع
                         
                         this.style.transform = ''; 
-                        this.classList.add('force-hover');
+                        this.classList.add('force-hover'); // اعمال افکت هاور با کد
                         
+                        // انتقال با تاخیر 0.4 ثانیه برای دیده شدن افکت در موبایل
                         setTimeout(() => {
                             this.classList.remove('force-hover');
                             if (target === '_blank') {
@@ -342,8 +410,7 @@
 
                 button.addEventListener('mousemove', (e) => {
                     if(button.getAttribute('data-status') === 'off') return;
-                    // غیرفعال کردن افکت سه‌بعدی اگر عرض صفحه کوچک بود (تشخیص موبایل/تبلت)
-                    if (window.innerWidth <= 768) return; 
+                    if (window.innerWidth <= 768) return; // غیرفعال کردن Tilt در موبایل
 
                     const rect = button.getBoundingClientRect();
                     const x = e.clientX - rect.left; 
@@ -362,7 +429,7 @@
                     button.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
                 });
             });
-        };
+        }
     </script>
 </body>
 </html>
