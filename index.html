@@ -76,6 +76,7 @@
             transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             transform-style: preserve-3d;
             text-decoration: none;
+            -webkit-tap-highlight-color: transparent; 
         }
 
         .social-btn::before {
@@ -89,17 +90,17 @@
             border-radius: inherit;
         }
 
-        .social-btn:hover::before {
+        .social-btn:hover::before, .social-btn.force-hover::before {
             opacity: 0.15; 
         }
 
-        .social-btn:hover {
+        .social-btn:hover, .social-btn.force-hover {
             box-shadow: 0 15px 30px -5px var(--brand-color-shadow), 0 0 15px rgba(0,0,0,0.5);
             border-color: rgba(255, 255, 255, 0.15);
             transform: scale(1.02);
         }
 
-        .social-btn:hover .icon-container {
+        .social-btn:hover .icon-container, .social-btn.force-hover .icon-container {
             transform: scale(1.15) rotate(-5deg);
             background: var(--brand-color);
             border-color: var(--brand-color);
@@ -107,9 +108,11 @@
         }
 
         .social-btn:hover .icon-container i, 
-        .social-btn:hover .icon-container svg path {
+        .social-btn:hover .icon-container svg path,
+        .social-btn.force-hover .icon-container i, 
+        .social-btn.force-hover .icon-container svg path {
             color: #fff;
-            fill: #fff; /* برای کیک */
+            fill: #fff; 
         }
 
         .icon-container {
@@ -162,7 +165,7 @@
             </div>
             
             <h1 class="text-2xl font-bold tracking-tight text-white fade-in-up" style="animation-delay: 0.3s;">
-                EPINOR
+                نام شما
             </h1>
         </header>
 
@@ -338,6 +341,35 @@
             const buttons = document.querySelectorAll('.social-btn');
 
             buttons.forEach(button => {
+                
+                button.addEventListener('click', function(e) {
+                    if(button.getAttribute('data-status') === 'off') return;
+                    
+                    const href = this.getAttribute('href');
+                    const target = this.getAttribute('target') || '_self';
+                    
+                    // اگر لینک واقعی بود (هشتگ خالی نبود)
+                    if (href && href !== '#') {
+                        e.preventDefault(); // متوقف کردن انتقال فوری
+                        
+                        // پاک کردن استایل‌های سه‌بعدی اینلاین تا تداخل ایجاد نکند
+                        this.style.transform = ''; 
+                        
+                        // روشن کردن دستی انیمیشن‌ها
+                        this.classList.add('force-hover');
+                        
+                        // صبر کردن به مدت 400 میلی‌ثانیه و سپس انتقال کاربر
+                        setTimeout(() => {
+                            this.classList.remove('force-hover');
+                            if (target === '_blank') {
+                                window.open(href, '_blank');
+                            } else {
+                                window.location.href = href;
+                            }
+                        }, 400); 
+                    }
+                });
+
                 button.addEventListener('mousemove', (e) => {
                     // فقط اگر دکمه مخفی نبود افکت را اجرا کن
                     if(button.getAttribute('data-status') === 'off') return;
